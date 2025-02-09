@@ -2430,7 +2430,7 @@ impl Processor {
         accounts: &[AccountInfo],
         amount_in: u64,
     ) -> Result<u64, ProgramError> {
-        const ACCOUNT_LEN: usize = 16;
+        const ACCOUNT_LEN: usize = 12;
         let input_account_len = accounts.len();
         if input_account_len != ACCOUNT_LEN {
             return Err(AmmError::WrongAccountsNumber.into());
