@@ -2428,7 +2428,7 @@ impl Processor {
     pub fn process_get_out(
         program_id: &Pubkey,
         accounts: &[AccountInfo],
-        swap: SwapInstructionBaseIn,
+        amount_in: u64,
     ) -> Result<u64, ProgramError> {
         const ACCOUNT_LEN: usize = 16;
         let input_account_len = accounts.len();
@@ -2533,13 +2533,13 @@ impl Processor {
         }
 
         // amm.fees pool 信息算出手续费
-        let swap_fee = U128::from(swap.amount_in)
+        let swap_fee = U128::from(amount_in)
             .checked_mul(amm.fees.swap_fee_numerator.into())
             .unwrap()
             .checked_ceil_div(amm.fees.swap_fee_denominator.into())
             .unwrap()
             .0;
-        let swap_in_after_deduct_fee = U128::from(swap.amount_in).checked_sub(swap_fee).unwrap();
+        let swap_in_after_deduct_fee = U128::from(amount_in).checked_sub(swap_fee).unwrap();
         // 这里算能换出多少了，可以计算出价格
         let swap_amount_out = Calculator::swap_token_amount_base_in(
             swap_in_after_deduct_fee, // 减去手续费的价格
