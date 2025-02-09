@@ -2430,9 +2430,9 @@ impl Processor {
         accounts: &[AccountInfo],
         swap: SwapInstructionBaseIn,
     ) -> Result<u64, ProgramError> {
-        const ACCOUNT_LEN: usize = 17;
+        const ACCOUNT_LEN: usize = 16;
         let input_account_len = accounts.len();
-        if input_account_len != ACCOUNT_LEN && input_account_len != ACCOUNT_LEN + 1 {
+        if input_account_len != ACCOUNT_LEN {
             return Err(AmmError::WrongAccountsNumber.into());
         }
         let account_info_iter = &mut accounts.iter();
@@ -2441,9 +2441,6 @@ impl Processor {
         let amm_info = next_account_info(account_info_iter)?;
         let amm_authority_info = next_account_info(account_info_iter)?;
         let amm_open_orders_info = next_account_info(account_info_iter)?;
-        if input_account_len == ACCOUNT_LEN + 1 {
-            let _amm_target_orders_info = next_account_info(account_info_iter)?;
-        }
         let amm_coin_vault_info = next_account_info(account_info_iter)?;
         let amm_pc_vault_info = next_account_info(account_info_iter)?;
 
@@ -2460,6 +2457,10 @@ impl Processor {
         let market_bids_info = next_account_info(account_info_iter)?;
         let market_asks_info = next_account_info(account_info_iter)?;
         let market_event_queue_info = next_account_info(account_info_iter)?;
+
+        let market_coin_vault_info = next_account_info(account_info_iter)?;
+        let market_pc_vault_info = next_account_info(account_info_iter)?;
+        // let market_vault_signer = next_account_info(account_info_iter)?;
 
         let user_source_info = next_account_info(account_info_iter)?;
         let user_destination_info = next_account_info(account_info_iter)?;
