@@ -1656,7 +1656,7 @@ impl Processor {
 
         if !pnl_owner_info.is_signer
             || (*pnl_owner_info.key != config_feature::amm_owner::ID
-                && *pnl_owner_info.key != amm_config.pnl_owner)
+            && *pnl_owner_info.key != amm_config.pnl_owner)
         {
             return Err(AmmError::InvalidSignAccount.into());
         }
@@ -2404,7 +2404,7 @@ impl Processor {
             total_coin_without_take_pnl.into(),
             swap_direction,
         )
-        .as_u64();
+            .as_u64();
         encode_ray_log(SwapBaseInLog {
             log_type: LogType::SwapBaseIn.into_u8(),
             amount_in: swap.amount_in,
@@ -2437,15 +2437,11 @@ impl Processor {
         }
         let account_info_iter = &mut accounts.iter();
         let token_program_info = next_account_info(account_info_iter)?;
-
         let amm_info = next_account_info(account_info_iter)?;
         let amm_authority_info = next_account_info(account_info_iter)?;
         let amm_open_orders_info = next_account_info(account_info_iter)?;
         let amm_coin_vault_info = next_account_info(account_info_iter)?;
         let amm_pc_vault_info = next_account_info(account_info_iter)?;
-
-        let market_program_info = next_account_info(account_info_iter)?;
-
         let mut amm = AmmInfo::load_mut_checked(&amm_info, program_id)?;
         let enable_orderbook;
         if AmmStatus::from_u64(amm.status).orderbook_permission() {
@@ -2457,51 +2453,9 @@ impl Processor {
         let market_bids_info = next_account_info(account_info_iter)?;
         let market_asks_info = next_account_info(account_info_iter)?;
         let market_event_queue_info = next_account_info(account_info_iter)?;
-
-        let market_coin_vault_info = next_account_info(account_info_iter)?;
-        let market_pc_vault_info = next_account_info(account_info_iter)?;
-        // let market_vault_signer = next_account_info(account_info_iter)?;
-
         let user_source_info = next_account_info(account_info_iter)?;
         let user_destination_info = next_account_info(account_info_iter)?;
-        let user_source_owner = next_account_info(account_info_iter)?;
-        if !user_source_owner.is_signer {
-            return Err(AmmError::InvalidSignAccount.into());
-        }
-        check_assert_eq!(
-            *token_program_info.key,
-            spl_token::id(),
-            "spl_token_program",
-            AmmError::InvalidSplTokenProgram
-        );
         let spl_token_program_id = token_program_info.key;
-        if *amm_authority_info.key
-            != Self::authority_id(program_id, AUTHORITY_AMM, amm.nonce as u8)?
-        {
-            return Err(AmmError::InvalidProgramAddress.into());
-        }
-        check_assert_eq!(
-            *amm_coin_vault_info.key,
-            amm.coin_vault,
-            "coin_vault",
-            AmmError::InvalidCoinVault
-        );
-        check_assert_eq!(
-            *amm_pc_vault_info.key,
-            amm.pc_vault,
-            "pc_vault",
-            AmmError::InvalidPCVault
-        );
-
-        if *user_source_info.key == amm.pc_vault || *user_source_info.key == amm.coin_vault {
-            return Err(AmmError::InvalidUserToken.into());
-        }
-        if *user_destination_info.key == amm.pc_vault
-            || *user_destination_info.key == amm.coin_vault
-        {
-            return Err(AmmError::InvalidUserToken.into());
-        }
-
         let amm_coin_vault =
             Self::unpack_token_account(&amm_coin_vault_info, spl_token_program_id)?;
         let amm_pc_vault = Self::unpack_token_account(&amm_pc_vault_info, spl_token_program_id)?;
@@ -2510,6 +2464,7 @@ impl Processor {
         let user_destination =
             Self::unpack_token_account(&user_destination_info, spl_token_program_id)?;
 
+        // 更新 state 不知道干啥
         if !AmmStatus::from_u64(amm.status).swap_permission() {
             msg!(&format!("swap_base_in: status {}", identity(amm.status)));
             let clock = Clock::get()?;
@@ -2517,7 +2472,6 @@ impl Processor {
                 && (clock.unix_timestamp as u64) >= amm.state_data.orderbook_to_init_time
             {
                 amm.status = AmmStatus::Initialized.into_u64();
-                msg!("swap_base_in: OrderBook to Initialized");
             } else {
                 return Err(AmmError::InvalidStatus.into());
             }
@@ -2535,25 +2489,8 @@ impl Processor {
         let total_coin_without_take_pnl;
         let mut bids: Vec<LeafNode> = Vec::new();
         let mut asks: Vec<LeafNode> = Vec::new();
+        // 是否用 orderbook？
         if enable_orderbook {
-            check_assert_eq!(
-                *amm_open_orders_info.key,
-                amm.open_orders,
-                "open_orders",
-                AmmError::InvalidOpenOrders
-            );
-            check_assert_eq!(
-                *market_program_info.key,
-                amm.market_program,
-                "market_program",
-                AmmError::InvalidMarketProgram
-            );
-            check_assert_eq!(
-                *market_info.key,
-                amm.market,
-                "market",
-                AmmError::InvalidMarket
-            );
             let (market_state, open_orders) = Processor::load_serum_market_order(
                 market_info,
                 amm_open_orders_info,
@@ -2575,6 +2512,7 @@ impl Processor {
                     &amm_open_orders_info,
                 )?;
         } else {
+            // 这两个参数也是需要的
             (total_pc_without_take_pnl, total_coin_without_take_pnl) =
                 Calculator::calc_total_without_take_pnl_no_orderbook(
                     amm_pc_vault.amount,
@@ -2582,7 +2520,7 @@ impl Processor {
                     &amm,
                 )?;
         }
-
+        // 交换方向，需要，其实也就只需要池内地址就好了
         let swap_direction;
         if user_source.mint == amm_coin_vault.mint && user_destination.mint == amm_pc_vault.mint {
             swap_direction = SwapDirection::Coin2PC
@@ -2593,19 +2531,8 @@ impl Processor {
         } else {
             return Err(AmmError::InvalidUserToken.into());
         }
-        if user_source.amount < swap.amount_in {
-            encode_ray_log(SwapBaseInLog {
-                log_type: LogType::SwapBaseIn.into_u8(),
-                amount_in: swap.amount_in,
-                minimum_out: swap.minimum_amount_out,
-                direction: swap_direction as u64,
-                user_source: user_source.amount,
-                pool_coin: total_coin_without_take_pnl,
-                pool_pc: total_pc_without_take_pnl,
-                out_amount: 0,
-            });
-            return Err(AmmError::InsufficientFunds.into());
-        }
+
+        // amm.fees pool 信息算出手续费
         let swap_fee = U128::from(swap.amount_in)
             .checked_mul(amm.fees.swap_fee_numerator.into())
             .unwrap()
@@ -2615,28 +2542,11 @@ impl Processor {
         let swap_in_after_deduct_fee = U128::from(swap.amount_in).checked_sub(swap_fee).unwrap();
         // 这里算能换出多少了，可以计算出价格
         let swap_amount_out = Calculator::swap_token_amount_base_in(
-            swap_in_after_deduct_fee,
+            swap_in_after_deduct_fee, // 减去手续费的价格
             total_pc_without_take_pnl.into(),
             total_coin_without_take_pnl.into(),
             swap_direction,
-        )
-            .as_u64();
-        encode_ray_log(SwapBaseInLog {
-            log_type: LogType::SwapBaseIn.into_u8(),
-            amount_in: swap.amount_in,
-            minimum_out: swap.minimum_amount_out,
-            direction: swap_direction as u64,
-            user_source: user_source.amount,
-            pool_coin: total_coin_without_take_pnl,
-            pool_pc: total_pc_without_take_pnl,
-            out_amount: swap_amount_out,
-        });
-        if swap_amount_out < swap.minimum_amount_out {
-            return Err(AmmError::ExceededSlippage.into());
-        }
-        if swap_amount_out == 0 || swap.amount_in == 0 {
-            return Err(AmmError::InvalidInput.into());
-        }
+        ).as_u64();
         Ok(swap_amount_out)
     }
 
@@ -2833,7 +2743,7 @@ impl Processor {
                     .swap_fee_denominator
                     .checked_sub(amm.fees.swap_fee_numerator)
                     .unwrap())
-                .into(),
+                    .into(),
             )
             .unwrap()
             .0
@@ -3153,13 +3063,13 @@ impl Processor {
             amm.pc_decimals,
             amm.sys_decimal_value,
         )
-        .as_u64();
+            .as_u64();
         let pnl_coin_amount = Calculator::restore_decimal(
             target.calc_pnl_y.into(),
             amm.coin_decimals,
             amm.sys_decimal_value,
         )
-        .as_u64();
+            .as_u64();
         // cancel amm orders in old market
         Self::do_cancel_amm_orders(
             &amm,
@@ -3303,13 +3213,13 @@ impl Processor {
                 amm.pc_decimals,
                 amm.sys_decimal_value,
             )
-            .as_u128();
+                .as_u128();
             target.calc_pnl_y = Calculator::normalize_decimal_v2(
                 pnl_coin_amount,
                 amm.coin_decimals,
                 amm.sys_decimal_value,
             )
-            .as_u128();
+                .as_u128();
         }
         amm.recent_epoch = Clock::get()?.epoch;
 
@@ -3472,13 +3382,13 @@ impl Processor {
                 amm.pc_decimals,
                 amm.sys_decimal_value,
             )
-            .as_u64();
+                .as_u64();
             pnl_coin_amount = Calculator::restore_decimal(
                 target.calc_pnl_y.into(),
                 amm.coin_decimals,
                 amm.sys_decimal_value,
             )
-            .as_u64();
+                .as_u64();
         } else {
             pnl_pc_amount = 0;
             pnl_coin_amount = 0;
@@ -3697,7 +3607,7 @@ impl Processor {
                 total_coin_without_take_pnl.into(),
                 swap_direction,
             )
-            .as_u64();
+                .as_u64();
             swap_base_in.minimum_amount_out = swap_amount_out;
             match swap_direction {
                 SwapDirection::Coin2PC => {
@@ -3923,7 +3833,7 @@ impl Processor {
                         .swap_fee_denominator
                         .checked_sub(amm.fees.swap_fee_numerator)
                         .unwrap())
-                    .into(),
+                        .into(),
                 )
                 .unwrap()
                 .0
@@ -4125,8 +4035,8 @@ impl Processor {
 
                         if (x.checked_mul(y).unwrap()
                             < U128::from(target.calc_pnl_x)
-                                .checked_mul(target.calc_pnl_y.into())
-                                .unwrap())
+                            .checked_mul(target.calc_pnl_y.into())
+                            .unwrap())
                             && bids.is_empty()
                             && asks.is_empty()
                         {
@@ -4149,7 +4059,7 @@ impl Processor {
                                 .unwrap()
                                 .as_u128(),
                         )
-                        .unwrap();
+                            .unwrap();
                         let mux_cur_price = (amm.pc_lot_size as u128)
                             .checked_mul(amm.max_price_multiplier as u128)
                             .unwrap();
@@ -4218,8 +4128,8 @@ impl Processor {
                         }
                         if (x.checked_mul(y).unwrap()
                             < U128::from(target.calc_pnl_x)
-                                .checked_mul(target.calc_pnl_y.into())
-                                .unwrap())
+                            .checked_mul(target.calc_pnl_y.into())
+                            .unwrap())
                             && bids.is_empty()
                             && asks.is_empty()
                         {
@@ -4351,8 +4261,8 @@ impl Processor {
 
         if x.checked_mul(y).unwrap()
             < U128::from(target.calc_pnl_x)
-                .checked_mul(target.calc_pnl_y.into())
-                .unwrap()
+            .checked_mul(target.calc_pnl_y.into())
+            .unwrap()
         {
             amm.state = AmmState::CancelAllOrdersState.into_u64();
         } else {
@@ -4433,7 +4343,7 @@ impl Processor {
                     .unwrap()
                     .as_u128(),
             )
-            .unwrap();
+                .unwrap();
             let mux_cur_price = (amm.pc_lot_size as u128)
                 .checked_mul(amm.max_price_multiplier as u128)
                 .unwrap();
@@ -5269,7 +5179,7 @@ impl Processor {
                         market_event_q_info,
                         amm_open_orders_info,
                     )
-                    .unwrap();
+                        .unwrap();
                     if shared_pc != 0 || shared_coin != 0 {
                         msg!("shared_pc:{}, shared_coin:{}", shared_pc, shared_coin);
                         return Err(AmmError::InvalidInput.into());
@@ -5535,7 +5445,7 @@ impl Processor {
                 referrer_pc_info,
                 Self::do_cancel_all_orders_state,
             )
-            .unwrap();
+                .unwrap();
         } else if amm.order_num == 0 {
             msg!(arrform!(
                 LOG_SIZE,
@@ -5578,7 +5488,7 @@ impl Processor {
                             idle_accounts,
                             Self::do_idle_state,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     AmmState::CancelAllOrdersState => {
                         msg!("monitor_step CancelAllOrdersState:{}", identity(amm.state));
@@ -5607,7 +5517,7 @@ impl Processor {
                             referrer_pc_info,
                             Self::do_cancel_all_orders_state,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     AmmState::PlanOrdersState => {
                         msg!("monitor_step PlanOrdersState:{}", identity(amm.state));
@@ -5629,7 +5539,7 @@ impl Processor {
                             plan_buy_accounts,
                             Self::do_plan_orderbook,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     AmmState::CancelOrderState => {
                         msg!("monitor_step CancelOrderState:{}", identity(amm.state));
@@ -5654,7 +5564,7 @@ impl Processor {
                             cancel_order_accounts,
                             Self::do_cancel_order,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     AmmState::PlaceOrdersState => {
                         msg!("monitor_step PlaceOrdersState:{}", identity(amm.state));
@@ -5686,7 +5596,7 @@ impl Processor {
                             srm_token_info,
                             Self::do_place_orders,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     AmmState::PurgeOrderState => {
                         msg!("monitor_step PurgeOrderState:{}", identity(amm.state));
@@ -5709,7 +5619,7 @@ impl Processor {
                             purge_orders_accounts,
                             Self::do_purge_orders,
                         )
-                        .unwrap();
+                            .unwrap();
                     }
                     _ => {
                         msg!("monitor_step InvalidState:{}", identity(amm.state));
@@ -5848,7 +5758,7 @@ impl Processor {
         let amm_config = AmmConfig::load_checked(&amm_config_info, program_id)?;
         if !amm_owner_info.is_signer
             || (*amm_owner_info.key != config_feature::amm_owner::ID
-                && *amm_owner_info.key != amm_config.cancel_owner)
+            && *amm_owner_info.key != amm_config.cancel_owner)
         {
             return Err(AmmError::InvalidSignAccount.into());
         }
@@ -6587,7 +6497,7 @@ mod test {
             x1.as_u128().into(),
             y1.as_u128().into(),
         )
-        .unwrap();
+            .unwrap();
         println!("delta_x:{}, delta_y:{}", delta_x, delta_y);
     }
 
@@ -6604,7 +6514,7 @@ mod test {
                 .integer_sqrt()
                 .as_u128(),
         )
-        .unwrap();
+            .unwrap();
         amm.initialize(0, 0, 5, 9, 1000000000, 7803).unwrap();
         amm.lp_amount = liquidity;
 
@@ -6619,9 +6529,9 @@ mod test {
         target.calc_pnl_x = x.as_u128();
         target.calc_pnl_y = y.as_u128();
         println!(
-             "init_pc_amount:{}, init_coin_amount:{}, liquidity:{}, sys_decimal_value:{}, calc_pnl_x:{}, calc_pnl_y:{}",
-             init_pc_amount, init_coin_amount, liquidity, identity(amm.sys_decimal_value), identity(target.calc_pnl_x), identity(target.calc_pnl_y)
-         );
+            "init_pc_amount:{}, init_coin_amount:{}, liquidity:{}, sys_decimal_value:{}, calc_pnl_x:{}, calc_pnl_y:{}",
+            init_pc_amount, init_coin_amount, liquidity, identity(amm.sys_decimal_value), identity(target.calc_pnl_x), identity(target.calc_pnl_y)
+        );
 
         // withdraw
         let withdraw_lp = 2577470628u64;
@@ -6646,7 +6556,7 @@ mod test {
             x1.as_u128().into(),
             y1.as_u128().into(),
         )
-        .unwrap();
+            .unwrap();
         println!("delta_x:{}, delta_y:{}", delta_x, delta_y);
         // coin_amount / total_coin_amount = amount / lp_mint.supply => coin_amount = total_coin_amount * amount / pool_mint.supply
         let invariant = InvariantPool {
@@ -6688,9 +6598,9 @@ mod test {
             .checked_sub(coin_amount)
             .unwrap();
         println!(
-             "withdraw calc_pnl_x:{}, calc_pnl_y:{}, total_pc_without_take_pnl:{}, total_coin_without_take_pnl:{}",
-             identity(target.calc_pnl_x), identity(target.calc_pnl_y), total_pc_without_take_pnl, total_coin_without_take_pnl
-         );
+            "withdraw calc_pnl_x:{}, calc_pnl_y:{}, total_pc_without_take_pnl:{}, total_coin_without_take_pnl:{}",
+            identity(target.calc_pnl_x), identity(target.calc_pnl_y), total_pc_without_take_pnl, total_coin_without_take_pnl
+        );
 
         // withdraw 2
         let x1 = Calculator::normalize_decimal_v2(
@@ -6712,7 +6622,7 @@ mod test {
             x1.as_u128().into(),
             y1.as_u128().into(),
         )
-        .unwrap();
+            .unwrap();
         println!("delta_x:{}, delta_y:{}", delta_x, delta_y);
     }
 
@@ -6740,7 +6650,7 @@ mod test {
             total_coin_without_take_pnl.into(),
             swap_direction,
         )
-        .as_u64();
+            .as_u64();
 
         println!("swap_amount_out:{}", swap_amount_out);
     }
