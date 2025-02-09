@@ -2456,14 +2456,16 @@ impl Processor {
         let user_source_info = next_account_info(account_info_iter)?;
         let user_destination_info = next_account_info(account_info_iter)?;
         let spl_token_program_id = token_program_info.key;
+        msg!("start parse 0");
         let amm_coin_vault =
             Self::unpack_token_account(&amm_coin_vault_info, spl_token_program_id)?;
         let amm_pc_vault = Self::unpack_token_account(&amm_pc_vault_info, spl_token_program_id)?;
-
+        msg!("start parse 1");
         let user_source = Self::unpack_token_account(&user_source_info, spl_token_program_id)?;
+        msg!("start parse 2");
         let user_destination =
             Self::unpack_token_account(&user_destination_info, spl_token_program_id)?;
-
+        msg!("start parse 3");
         // 更新 state 不知道干啥
         if !AmmStatus::from_u64(amm.status).swap_permission() {
             msg!(&format!("swap_base_in: status {}", identity(amm.status)));
@@ -2484,7 +2486,7 @@ impl Processor {
                 msg!("swap_base_in: WaitingTrade to SwapOnly");
             }
         }
-
+        msg!("start parse 4");
         let total_pc_without_take_pnl;
         let total_coin_without_take_pnl;
         let mut bids: Vec<LeafNode> = Vec::new();
@@ -2520,6 +2522,7 @@ impl Processor {
                     &amm,
                 )?;
         }
+        msg!("start parse 5");
         // 交换方向，需要，其实也就只需要池内地址就好了
         let swap_direction;
         if user_source.mint == amm_coin_vault.mint && user_destination.mint == amm_pc_vault.mint {
@@ -2531,7 +2534,7 @@ impl Processor {
         } else {
             return Err(AmmError::InvalidUserToken.into());
         }
-
+        msg!("start parse 6");
         // amm.fees pool 信息算出手续费
         let swap_fee = U128::from(amount_in)
             .checked_mul(amm.fees.swap_fee_numerator.into())
